@@ -22,21 +22,6 @@ import gc
 import resource
 import sys
 
-configSec 	= 'DEFAULT'
-config 		= SafeConfigParser()
-config.read('config.ini')
-
-vidLen 		= int(config.get(configSec, 'vidLen'))
-dataPath 	= config.get(configSec, 'dataPath')
-trigWidth		= int(config.get(configSec, 'trigWidth'))
-
-T_SESSION_START = int(config.get(configSec, 'T_SESSION_START'))
-T_VID_START = int(config.get(configSec, 'T_VID_START'))
-T_INTERVAL  = int(config.get(configSec, 'T_INTERVAL'))
-T_BG		= int(config.get(configSec, 'T_BG'))
-n_epoch		= int(config.get(configSec, 'N_EPOCH'))
-pin_order	= map(int, (config.get(configSec, 'PIN')).split(','))
-
 def printBuildInfo():
 	libVer = PyCapture2.getLibraryVersion()
 	print "PyCapture2 library version: ", libVer[0], libVer[1], libVer[2], libVer[3]
@@ -161,62 +146,78 @@ def saveVideo(iCam):
 	cam.disconnect()
 
 
-try:
-	call(["modprobe", "ppdev"])
-except:
-	print "Exception caught removing lp driver\n\n"
+configSec 	= 'DEFAULT'
+config 		= SafeConfigParser()
+config.read('config.ini')
 
-# Try removing the printer driver that gets installed on each reboot of the machine
-try:
-	call(["rmmod", "lp"])
-except:
-	print "Exception caught removing lp driver\n\n"
+vidLen 		= int(config.get(configSec, 'vidLen'))
+dataPath 	= config.get(configSec, 'dataPath')
+trigWidth		= int(config.get(configSec, 'trigWidth'))
+
+T_SESSION_START = int(config.get(configSec, 'T_SESSION_START'))
+T_VID_START = int(config.get(configSec, 'T_VID_START'))
+T_INTERVAL  = int(config.get(configSec, 'T_INTERVAL'))
+T_BG		= int(config.get(configSec, 'T_BG'))
+n_epoch		= int(config.get(configSec, 'N_EPOCH'))
+pin_order	= map(int, (config.get(configSec, 'PIN')).split(','))
+
+if __name__ == "__main__":
+	try:
+		call(["modprobe", "ppdev"])
+	except:
+		print "Exception caught removing lp driver\n\n"
+
+	# Try removing the printer driver that gets installed on each reboot of the machine
+	try:
+		call(["rmmod", "lp"])
+	except:
+		print "Exception caught removing lp driver\n\n"
 
 
-# Print PyCapture2 Library Information
-printBuildInfo()
+	# Print PyCapture2 Library Information
+	printBuildInfo()
 
-# PyCapture2.Config.grabMode = 1
-# PyCapture2.Config.highPerformanceRetrieveBuffer = 1
-# Ensure sufficient cameras are found
-bus = PyCapture2.BusManager()
-numCams = bus.getNumOfCameras()
+	# PyCapture2.Config.grabMode = 1
+	# PyCapture2.Config.highPerformanceRetrieveBuffer = 1
+	# Ensure sufficient cameras are found
+	bus = PyCapture2.BusManager()
+	numCams = bus.getNumOfCameras()
 
-print "Number of cameras detected: ", numCams
-if not numCams:
-	print "Insufficient number of cameras. Exiting..."
-	exit()
+	print "Number of cameras detected: ", numCams
+	if not numCams:
+		print "Insufficient number of cameras. Exiting..."
+		exit()
 
-# Get the current time and initialize the project folder
-t = datetime.now()
-dataPath = dataPath + str(t.year) + format(t.month, '02d') + format(t.day, '02d') + \
-		   format(t.hour, '02d') + format(t.minute, '02d') + format(t.second, '02d')
-if not os.path.exists(dataPath):
-	print "Creating data directory: %s" % dataPath
-	os.makedirs(dataPath)
-	for cam in range(numCams):
-		os.makedirs(dataPath + os.sep + "cam" + str(cam))
+	# Get the current time and initialize the project folder
+	t = datetime.now()
+	dataPath = dataPath + str(t.year) + format(t.month, '02d') + format(t.day, '02d') + \
+			   format(t.hour, '02d') + format(t.minute, '02d') + format(t.second, '02d')
+	if not os.path.exists(dataPath):
+		print "Creating data directory: %s" % dataPath
+		os.makedirs(dataPath)
+		for cam in range(numCams):
+			os.makedirs(dataPath + os.sep + "cam" + str(cam))
 
-# save the configuration used
-with open(dataPath + '/config.ini', 'w') as f:
-	config.write(f)
+	# save the configuration used
+	with open(dataPath + '/config.ini', 'w') as f:
+		config.write(f)
 
-p = parallel.Parallel()
+	p = parallel.Parallel()
 
-num_cores = multiprocessing.cpu_count()
-print 'number of cpu cores: ' + str(num_cores)
+	num_cores = multiprocessing.cpu_count()
+	print 'number of cpu cores: ' + str(num_cores)
 
-sendTrigger(0)
+	sendTrigger(0)
 
-t1 = clock()
+	t1 = clock()
 
-try:
-	Parallel(n_jobs=numCams)(delayed(saveVideo)(i) for i in range(0, numCams))
-except KeyboardInterrupt:
-	print "Stopping video recording."
+	try:
+		Parallel(n_jobs=numCams)(delayed(saveVideo)(i) for i in range(0, numCams))
+	except KeyboardInterrupt:
+		print "Stopping video recording."
 
-t2 = clock()
+	t2 = clock()
 
-sendTrigger(0)
+	sendTrigger(0)
 
-print 'time taken ' + str(t2 - t1)
+	print 'time taken ' + str(t2 - t1)
